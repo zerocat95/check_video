@@ -1,0 +1,1 @@
+python3 main.py --host=192.168.1.100 --username=zerocat7 --password=Luozhou7 --dir=/ --yes

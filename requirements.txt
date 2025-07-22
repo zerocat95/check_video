@@ -1,0 +1,8 @@
+pandas
+openpyxl
+imagehash
+Pillow
+opencv-python
+tqdm
+pysmb
+cryptography
