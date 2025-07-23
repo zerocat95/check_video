@@ -753,14 +753,42 @@ def generate_report(scan_target, similarity_threshold):
                 duplicate_groups.append(healthy_videos.loc[current_group_indices])
 
     report_sheets = {}
+    
+    # 创建总览表，包含所有文件
     df_summary = df[['file_path', 'health_status', 'health_score', 'resolution', 'bitrate', 'file_size', 'duration']].copy()
+    
+    # 处理空值和0值，确保显示为有效数据
     df_summary['bitrate (kbps)'] = (df_summary['bitrate'] / 1000).round(2)
+    df_summary['bitrate (kbps)'] = df_summary['bitrate (kbps)'].apply(lambda x: 'N/A' if x == 0 else x)
+    
     df_summary['file_size (MB)'] = (df_summary['file_size'] / (1024*1024)).round(2)
-    df_summary.rename(columns={'duration': 'duration (s)', 'health_score': '健康值'}, inplace=True)
-    report_sheets['总览'] = df_summary[['file_path', 'health_status', '健康值', 'resolution', 'bitrate (kbps)', 'file_size (MB)', 'duration (s)']]
+    df_summary['file_size (MB)'] = df_summary['file_size (MB)'].apply(lambda x: 'N/A' if x == 0 else x)
+    
+    df_summary['duration (s)'] = df_summary['duration'].round(2)
+    df_summary['duration (s)'] = df_summary['duration (s)'].apply(lambda x: 'N/A' if x == 0 else x)
+    
+    # 处理分辨率
+    df_summary['resolution'] = df_summary['resolution'].replace({'Error': 'N/A', '': 'N/A', 0: 'N/A'})
+    
+    # 处理健康值
+    df_summary['健康值'] = df_summary['health_score'].astype(int)
+    
+    # 重命名列
+    df_summary = df_summary[['file_path', 'health_status', '健康值', 'resolution', 'bitrate (kbps)', 'file_size (MB)', 'duration (s)']]
+    df_summary.rename(columns={'health_status': '健康状态', 'resolution': '分辨率'}, inplace=True)
+    
+    report_sheets['总览'] = df_summary
 
     if not corrupted_files.empty:
-        report_sheets['损坏或处理失败的文件'] = corrupted_files[['file_path', 'health_status']]
+        # 为损坏的文件也生成完整报告
+        corrupted_summary = corrupted_files[['file_path', 'health_status', 'health_score', 'resolution', 'bitrate', 'file_size', 'duration']].copy()
+        corrupted_summary['bitrate (kbps)'] = 'N/A'
+        corrupted_summary['file_size (MB)'] = 'N/A'
+        corrupted_summary['duration (s)'] = 'N/A'
+        corrupted_summary['resolution'] = 'N/A'
+        corrupted_summary['健康值'] = corrupted_summary['health_score'].astype(int)
+        corrupted_summary = corrupted_summary[['file_path', 'health_status', '健康值', 'resolution', 'bitrate (kbps)', 'file_size (MB)', 'duration (s)']]
+        report_sheets['损坏或处理失败的文件'] = corrupted_summary
 
     if duplicate_groups:
         all_duplicates_data = []
@@ -784,18 +812,36 @@ def generate_report(scan_target, similarity_threshold):
             # 更新 duplicate_groups 列表为排序和添加了建议操作后的版本
             duplicate_groups = all_duplicates_data
             df_duplicates = pd.concat(all_duplicates_data)
-            final_columns = ['重复组ID', 'file_path', 'resolution', 'bitrate (kbps)', '容量(MB)', 'health_score', '建议操作']
-            df_duplicates.rename(columns={'health_score': '健康值', 'file_path': '文件路径', 'resolution': '分辨率'}, inplace=True)
+            df_duplicates['bitrate (kbps)'] = (df_duplicates['bitrate'] / 1000).round(2)
+            df_duplicates['容量(MB)'] = (df_duplicates['file_size'] / (1024*1024)).round(2)
+            df_duplicates['健康值'] = df_duplicates['health_score'].astype(int)
+            
+            # 使用原始列名
+            final_columns = ['重复组ID', 'file_path', 'resolution', 'bitrate (kbps)', '容量(MB)', '健康值', '建议操作']
             report_sheets['内容重复的文件'] = df_duplicates[final_columns]
 
     # --- 生成 Excel 报告 ---
     try:
-        with pd.ExcelWriter('video_analysis_report.xlsx', engine='openpyxl') as writer:
+        # 使用xlsxwriter引擎处理特殊字符
+        with pd.ExcelWriter('video_analysis_report.xlsx', engine='xlsxwriter') as writer:
             for sheet_name, data_frame in report_sheets.items():
+                # 确保文件路径列是字符串类型
+                data_frame = data_frame.copy()
+                if 'file_path' in data_frame.columns:
+                    data_frame['file_path'] = data_frame['file_path'].astype(str)
+                elif '文件路径' in data_frame.columns:
+                    data_frame['文件路径'] = data_frame['文件路径'].astype(str)
                 data_frame.to_excel(writer, sheet_name=sheet_name, index=False)
         logging.info("报告已生成: video_analysis_report.xlsx")
     except Exception as e:
         logging.error(f"生成 Excel 报告失败: {e}")
+        # 如果Excel生成失败，生成CSV作为备选
+        try:
+            if '总览' in report_sheets:
+                report_sheets['总览'].to_csv('video_analysis_report.csv', index=False, encoding='utf-8-sig')
+                logging.info("已生成CSV格式报告: video_analysis_report.csv")
+        except Exception as csv_error:
+            logging.error(f"生成CSV报告也失败: {csv_error}")
 
     return duplicate_groups, df
 

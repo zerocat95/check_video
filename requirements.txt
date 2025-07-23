@@ -1,5 +1,6 @@
 pandas
 openpyxl
+xlsxwriter
 imagehash
 Pillow
 opencv-python
