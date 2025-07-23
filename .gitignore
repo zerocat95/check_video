@@ -1,0 +1,39 @@
+# 忽略所有文件
+*
+
+# 但保留以下文件
+!.gitignore
+!auto.sh
+!config.ini
+!main.py
+!requirements.txt
+!setup.sh
+!start.sh
+!README.md
+
+# 忽略系统文件
+.DS_Store
+*.log
+*.tmp
+*.bak
+*~
+
+# 忽略数据库文件
+*.db
+*.sqlite
+*.sqlite3
+
+# 忽略配置文件
+.env
+*.key
+*.pem
+
+# 忽略生成的报告
+*.xlsx
+*.csv
+*.pdf
+
+# 忽略缓存和临时文件
+__pycache__/
+*.pyc
+*.pyo
